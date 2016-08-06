@@ -17,29 +17,34 @@ from os.path import dirname, basename, join, isfile
 from collections import namedtuple
 
 
-Module = namedtuple('Module', ['name', 'instance'])
-ROOT_PARAMS_KEY = 'ROOT_PARAMS'
-
-
-def full_name(name):
-    """ Produces the full name of a package in this directory. """
-    return "dockerdb.cli." + name
-
-
 def get_modules():
-    """ Get all the modules in this directory. """
-    module_filepaths = glob(join(dirname(__file__), '*.py'))
-    module_names = [basename(f)[:-3] for f in module_filepaths
-                                     if isfile(f)
-                                     if basename(f) != '__init__.py']
-    modules = [Module(name, import_module(full_name(name))) for name in module_names]
+    """ Get all the modules in this directory.
+
+    Excludes __init__.py and cli.py when searching for modules. Returns a list
+    of Module tuples that store the module instance and the module name.
+    """
+    Module = namedtuple('Module', ['name', 'instance'])
+    exclude_files = {'__init__.py', 'cli.py'}
+    full_path = lambda name: "app." + name
+
+    filepaths = glob(join(dirname(__file__), '*.py'))
+
+    modules = []
+    for path in filepaths:
+        if not isfile(f) or basename(f) in exclude_files:
+            continue
+
+        filename = basename(f)[:-3]
+        instance = import_module(full_path(filename))
+        modules.append(Module(filename, module))
 
     return modules
 
 
-def get_commands_params():
-    """Get the various commands and params exposed by other modules in this directory."""
-    modules = get_modules()
+def get_commands_params(modules):
+    """ Given a list of modules, get the Click commands and params. """
+    ROOT_PARAMS_KEY = 'ROOT_PARAMS'
+
     params = []
     commands = {}
     for module in modules:
@@ -51,6 +56,7 @@ def get_commands_params():
             commands[command.name] = command
 
     return commands, params
+
 
 commands, params = get_commands_params()
 cli = click.Group(commands=commands, params=params)
